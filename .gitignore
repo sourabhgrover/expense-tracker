@@ -6,3 +6,6 @@ __pycache__/
 .env
 .DS_Store
 .claude/plans/
+screenshots/
+raw-notes.md
+2026-09-20-141228-how-to-open-bash-inside-claude-session.txt
