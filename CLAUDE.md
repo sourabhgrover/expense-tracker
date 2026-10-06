@@ -1,40 +1,118 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Project overview
 
-Spendly is a Flask-based expense tracker built incrementally as a step-by-step learning project. Many routes and modules are intentionally left as stubs with comments like `# Students will write this file in Step 1 — Database Setup` or return placeholder text such as `"Logout — coming in Step 3"`. When working on this codebase, check whether the piece you're touching is one of these placeholders before assuming it's a bug — implement it according to the step it references rather than deleting the scaffold comments.
+Spendly is a lightweight personal expense tracker built with Flask and SQLite.
 
-## Commands
-
-```bash
-# Activate the virtualenv (already created under venv/)
-venv\Scripts\activate          # PowerShell/cmd
-source venv/Scripts/activate   # Git Bash
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run the dev server (debug mode, port 5001)
-python app.py
-
-# Run tests (pytest + pytest-flask are in requirements.txt; no tests/ directory exists yet)
-pytest
-pytest path/to/test_file.py::test_name   # single test
-```
-
-There is no lint/format tooling configured in this repo.
+---
 
 ## Architecture
+```
+spendly/
+├── app.py              # All routes — single file, no blueprints
+├── database/
+│   └── db.py           # SQLite helpers: get_db(), init_db(), seed_db()
+├── templates/
+│   ├── base.html       # Shared layout — all templates must extend this
+│   └── *.html          # One template per page
+├── static/
+│   ├── css/
+│   │   ├── style.css       # Global styles
+│   │   └── landing.css     # Landing-page-only styles
+│   └── js/
+│       └── main.js         # Vanilla JS only
+└── requirements.txt
+```
 
-- **`app.py`** — single Flask entrypoint. All routes are defined directly on the module-level `app` object (no blueprints). Routes are grouped into two sections via comments: implemented page routes (`/`, `/register`, `/login`, `/terms`, `/privacy`) and placeholder routes for not-yet-built features (`/logout`, `/profile`, `/expenses/add`, `/expenses/<id>/edit`, `/expenses/<id>/delete`), each returning a plain string naming the future step that implements it.
-- **`database/db.py`** — intended to hold `get_db()` (SQLite connection with `row_factory` and foreign keys enabled), `init_db()` (creates tables with `CREATE TABLE IF NOT EXISTS`), and `seed_db()` (sample data for development). Not yet implemented — currently just a comment describing the contract. The SQLite file itself (`expense_tracker.db`) is gitignored and created at runtime, not committed.
-- **`templates/`** — Jinja2 templates. `base.html` defines the shared shell (nav, footer, `main.js` include) with `{% block title %}`, `{% block head %}`, `{% block content %}`, and `{% block scripts %}`. Page templates (`landing.html`, `register.html`, `login.html`, `terms.html`, `privacy.html`) extend `base.html` and pull in their own page-specific stylesheet/script via the `head`/`scripts` blocks (e.g. `landing.html` loads `css/landing.css` and references `js/landing.js`'s DOM ids).
-- **`static/css/`** — `style.css` holds shared/base styles used across all pages; per-page styles (e.g. `landing.css`) live in their own file and are only loaded by the page that needs them.
-- **`static/js/`** — `main.js` is loaded globally from `base.html` (currently empty, meant to grow as shared features are added); per-page scripts (e.g. `landing.js`) are loaded only from the page's own `{% block scripts %}` and should stay vanilla JS with no dependencies/frameworks, consistent with the existing `landing.js` modal implementation.
+**Where things belong:**
+- New routes → `app.py` only, no blueprints
+- DB logic → `database/db.py` only, never inline in routes
+- New pages → new `.html` file extending `base.html`
+- Page-specific styles → new `.css` file, not inline `<style>` tags
 
-## Conventions to follow
+---
 
-- No JS framework or external JS libraries — keep all client-side code vanilla JS, matching `static/js/landing.js`.
-- When adding a new page, follow the existing template pattern: extend `base.html`, add a page-specific CSS/JS file under `static/` only if the page needs one, and wire the route in `app.py`.
+## Code style
+
+- Python: PEP 8, snake_case for all variables and functions
+- Templates: Jinja2 with `url_for()` for every internal link — never hardcode URLs
+- Route functions: one responsibility only — fetch data, render template, done
+- DB queries: always use parameterized queries (`?` placeholders) — never f-strings in SQL
+- Error handling: use `abort()` for HTTP errors, not bare `return "error string"`
+
+---
+
+## Tech constraints
+
+- **Flask only** — no FastAPI, no Django, no other web frameworks
+- **SQLite only** — no PostgreSQL, no SQLAlchemy ORM, no external DB
+- **Vanilla JS only** — no React, no jQuery, no npm packages
+- **No new pip packages** — work within `requirements.txt` as-is unless explicitly told otherwise
+- Python 3.10+ assumed — f-strings and `match` statements are fine
+
+---
+
+## Subagent Policy
+- Always use a builtin explore subagent for codebase exploration 
+  before implementing any new feature
+- Always use a subagent to verify test results 
+  after any implementation
+- When asked to plan, delegate codebase research 
+  to a subagent before presenting the plan
+- always use a builtin plan subagent in plan mode
+
+---
+
+## Commands
+```bash
+# Setup
+python -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+
+# Run dev server (port 5001)
+python app.py
+
+# Run all tests
+pytest
+
+# Run a specific test file
+pytest tests/test_foo.py
+
+# Run a specific test by name
+pytest -k "test_name"
+
+# Run tests with output visible
+pytest -s
+```
+
+---
+
+## Implemented vs stub routes
+
+| Route | Status |
+|---|---|
+| `GET /` | Implemented — renders `landing.html` |
+| `GET /register` | Implemented — renders `register.html` |
+| `GET /login` | Implemented — renders `login.html` |
+| `GET /logout` | Stub — Step 3 |
+| `GET /profile` | Stub — Step 4 |
+| `GET /expenses/add` | Stub — Step 7 |
+| `GET /expenses/<id>/edit` | Stub — Step 8 |
+| `GET /expenses/<id>/delete` | Stub — Step 9 |
+
+**Do not implement a stub route unless the active task explicitly targets that step.**
+
+---
+
+## Warnings and things to avoid
+
+- **Never use raw string returns for stub routes** once a step is implemented — always render a template
+- **Never hardcode URLs** in templates — always use `url_for()`
+- **Never put DB logic in route functions** — it belongs in `database/db.py`
+- **Never install new packages** mid-feature without flagging it — keep `requirements.txt` in sync
+- **Never use JS frameworks** — the frontend is intentionally vanilla
+- **`database/db.py` is currently empty** — do not assume helpers exist until the step that implements them
+- **FK enforcement is manual** — SQLite foreign keys are off by default; `get_db()` must run `PRAGMA foreign_keys = ON` on every connection
+- The app runs on **port 5001**, not the Flask default 5000 — don't change this
+
