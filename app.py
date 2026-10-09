@@ -1,10 +1,14 @@
+import os
 import sqlite3
 
-from flask import Flask, redirect, render_template, request, url_for
+from flask import Flask, redirect, render_template, request, session, url_for
+from werkzeug.security import check_password_hash
 
 from database.db import create_user, get_db, get_user_by_email, init_db, seed_db
 
 app = Flask(__name__)
+# Development fallback only — production must set the SECRET_KEY env var.
+app.secret_key = os.environ.get("SECRET_KEY", "dev-only-insecure-secret-key")
 
 with app.app_context():
     init_db()
@@ -69,9 +73,32 @@ def register():
     return redirect(url_for("login"))
 
 
-@app.route("/login")
+LOGIN_ERROR = "Invalid email or password."
+
+
+@app.context_processor
+def inject_current_user():
+    return {"current_user_id": session.get("user_id")}
+
+
+@app.route("/login", methods=["GET", "POST"])
 def login():
-    return render_template("login.html")
+    if session.get("user_id"):
+        return redirect(url_for("profile"))
+
+    if request.method == "GET":
+        return render_template("login.html")
+
+    email = request.form.get("email", "").strip().lower()
+    password = request.form.get("password", "")
+
+    user = get_user_by_email(email) if email and password else None
+    if user is None or not check_password_hash(user["password_hash"], password):
+        return render_template("login.html", error=LOGIN_ERROR, email=email)
+
+    session.clear()
+    session["user_id"] = user["id"]
+    return redirect(url_for("profile"))
 
 
 @app.route("/terms")
@@ -90,7 +117,8 @@ def privacy():
 
 @app.route("/logout")
 def logout():
-    return "Logout — coming in Step 3"
+    session.clear()
+    return redirect(url_for("landing"))
 
 
 @app.route("/profile")
